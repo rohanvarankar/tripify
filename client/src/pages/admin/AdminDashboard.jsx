@@ -1,52 +1,57 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
-  updateUserStart,
-  updateUserSuccess,
-  updateUserFailure,
-  logOutStart,
-  logOutSuccess,
-  logOutFailure,
-  deleteUserAccountStart,
-  deleteUserAccountSuccess,
-  deleteUserAccountFailure,
+  updateUserStart, updateUserSuccess, updateUserFailure,
+  logOutStart, logOutSuccess, logOutFailure,
+  deleteUserAccountStart, deleteUserAccountSuccess, deleteUserAccountFailure,
 } from "../../redux/user/userSlice";
-import {
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytesResumable,
-} from "firebase/storage";
+import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage";
 import { app } from "../../firebase";
 import AllBookings from "./AllBookings";
 import AdminUpdateProfile from "./AdminUpdateProfile";
 import AddPackages from "./AddPackages";
-import "./styles/DashboardStyle.css";
 import AllPackages from "./AllPackages";
 import AllUsers from "./AllUsers";
 import Payments from "./Payments";
 import RatingsReviews from "./RatingsReviews";
 import History from "./History";
+import DashboardOverview from "./DashboardOverview";
+import {
+  FiGrid, FiHome, FiPackage, FiPlusSquare, FiUsers, FiCreditCard,
+  FiStar, FiClock, FiUser, FiLogOut, FiTrash2, FiMenu, FiX, FiCamera,
+} from "react-icons/fi";
+import { FaPlane } from "react-icons/fa";
+import defaultProfileImg from "../../assets/images/profile.png";
+
+const NAV_ITEMS = [
+  { id: 0, label: "Overview",       icon: <FiGrid size={18} /> },
+  { id: 1, label: "Bookings",       icon: <FiHome size={18} /> },
+  { id: 2, label: "Add Package",    icon: <FiPlusSquare size={18} /> },
+  { id: 3, label: "All Packages",   icon: <FiPackage size={18} /> },
+  { id: 4, label: "Users",          icon: <FiUsers size={18} /> },
+  { id: 5, label: "Payments",       icon: <FiCreditCard size={18} /> },
+  { id: 6, label: "Ratings",        icon: <FiStar size={18} /> },
+  { id: 7, label: "History",        icon: <FiClock size={18} /> },
+  { id: 8, label: "Edit Profile",   icon: <FiUser size={18} /> },
+];
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const fileRef = useRef(null);
-  const { currentUser, loading, error } = useSelector((state) => state.user);
+  const { currentUser, loading } = useSelector((state) => state.user);
+
   const [profilePhoto, setProfilePhoto] = useState(undefined);
   const [photoPercentage, setPhotoPercentage] = useState(0);
-  const [activePanelId, setActivePanelId] = useState(1);
+  const [activePanelId, setActivePanelId] = useState(0);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    address: "",
-    phone: "",
-    avatar: "",
+    username: "", email: "", address: "", phone: "", avatar: "",
   });
 
   useEffect(() => {
-    if (currentUser !== null) {
+    if (currentUser) {
       setFormData({
         username: currentUser.username,
         email: currentUser.email,
@@ -62,51 +67,34 @@ const AdminDashboard = () => {
       dispatch(updateUserStart());
       const storage = getStorage(app);
       const photoname = new Date().getTime() + photo.name.replace(/\s/g, "");
-      const storageRef = ref(storage, `profile-photos/${photoname}`); //profile-photos - folder name in firebase
+      const storageRef = ref(storage, `profile-photos/${photoname}`);
       const uploadTask = uploadBytesResumable(storageRef, photo);
-
-      uploadTask.on(
-        "state_changed",
+      uploadTask.on("state_changed",
         (snapshot) => {
-          const progress = Math.floor(
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-          );
-          //   console.log(progress);
-          setPhotoPercentage(progress);
+          setPhotoPercentage(Math.floor((snapshot.bytesTransferred / snapshot.totalBytes) * 100));
         },
-        (error) => {
-          console.log(error);
-        },
+        (error) => console.log(error),
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then(async (downloadUrl) => {
-            const res = await fetch(
-              `/api/user/update-profile-photo/${currentUser._id}`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": " application/json",
-                },
-                body: JSON.stringify({ avatar: downloadUrl }),
-              }
-            );
+            const res = await fetch(`/api/user/update-profile-photo/${currentUser._id}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ avatar: downloadUrl }),
+            });
             const data = await res.json();
             if (data?.success) {
-              alert(data?.message);
               setFormData({ ...formData, avatar: downloadUrl });
               dispatch(updateUserSuccess(data?.user));
               setProfilePhoto(null);
-              return;
+              alert(data?.message);
             } else {
               dispatch(updateUserFailure(data?.message));
+              alert(data?.message);
             }
-            dispatch(updateUserFailure(data?.message));
-            alert(data?.message);
           });
         }
       );
-    } catch (error) {
-      console.log(error);
-    }
+    } catch (error) { console.log(error); }
   };
 
   const handleLogout = async () => {
@@ -114,267 +102,185 @@ const AdminDashboard = () => {
       dispatch(logOutStart());
       const res = await fetch("/api/auth/logout");
       const data = await res.json();
-      if (data?.success !== true) {
-        dispatch(logOutFailure(data?.message));
-        return;
-      }
+      if (!data?.success) { dispatch(logOutFailure(data?.message)); return; }
       dispatch(logOutSuccess());
       navigate("/login");
-      alert(data?.message);
-    } catch (error) {
-      console.log(error);
-    }
+    } catch (error) { console.log(error); }
   };
 
   const handleDeleteAccount = async (e) => {
     e.preventDefault();
-    const CONFIRM = confirm(
-      "Are you sure ? the account will be permenantly deleted!"
-    );
-    if (CONFIRM) {
-      try {
-        dispatch(deleteUserAccountStart());
-        const res = await fetch(`/api/user/delete/${currentUser._id}`, {
-          method: "DELETE",
-        });
-        const data = await res.json();
-        if (data?.success === false) {
-          dispatch(deleteUserAccountFailure(data?.message));
-          alert("Something went wrong!");
-          return;
-        }
-        dispatch(deleteUserAccountSuccess());
-        alert(data?.message);
-      } catch (error) {}
-    }
+    if (!confirm("Are you sure? This account will be permanently deleted!")) return;
+    try {
+      dispatch(deleteUserAccountStart());
+      const res = await fetch(`/api/user/delete/${currentUser._id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data?.success) { dispatch(deleteUserAccountFailure(data?.message)); return; }
+      dispatch(deleteUserAccountSuccess());
+      alert(data?.message);
+    } catch (error) { console.log(error); }
   };
 
-  return (
-    <div className="flex w-full flex-wrap max-sm:flex-col p-2">
-      {currentUser ? (
-        <>
-          <div className="w-[35%] p-3 max-sm:w-full">
-            <div className="flex flex-col items-center gap-4 p-3">
-              <div className="w-full flex flex-col items-center relative">
-                <img
-                  src={
-                    (profilePhoto && URL.createObjectURL(profilePhoto)) ||
-                    formData.avatar
-                  }
-                  alt="Profile photo"
-                  className="w-64 min-h-52 max-h-64 rounded-lg"
-                  onClick={() => fileRef.current.click()}
-                  onMouseOver={() => {
-                    document
-                      .getElementById("photoLabel")
-                      .classList.add("block");
-                  }}
-                  onMouseOut={() => {
-                    document
-                      .getElementById("photoLabel")
-                      .classList.remove("block");
-                  }}
-                />
-                <input
-                  type="file"
-                  name="photo"
-                  id="photo"
-                  hidden
-                  ref={fileRef}
-                  accept="image/*"
-                  onChange={(e) => setProfilePhoto(e.target.files[0])}
-                />
-                <label
-                  htmlFor="photo"
-                  id="photoLabel"
-                  className="w-64 bg-slate-300 absolute bottom-0 p-2 text-center text-lg text-white font-semibold rounded-b-lg"
-                  hidden
-                >
-                  Choose Photo
-                </label>
-              </div>
-              {profilePhoto && (
-                <div className="flex w-full justify-between gap-1">
-                  <button
-                    onClick={() => handleProfilePhoto(profilePhoto)}
-                    className="bg-green-700 p-2 text-white mt-3 flex-1 hover:opacity-90"
-                  >
-                    {loading ? `Uploading...(${photoPercentage}%)` : "Upload"}
-                  </button>
-                </div>
-              )}
-              <p
-                style={{
-                  width: "100%",
-                  borderBottom: "1px solid black",
-                  lineHeight: "0.1em",
-                  margin: "10px",
-                }}
-              >
-                <span className="font-semibold" style={{ background: "#fff" }}>
-                  Details
-                </span>
-              </p>
-              <div className="w-full flex justify-between px-1">
-                <button
-                  onClick={handleLogout}
-                  className="text-red-600 text-lg font-semibold self-start border border-red-600 p-1 rounded-lg hover:bg-red-600 hover:text-white"
-                >
-                  Log-out
-                </button>
-                <button
-                  onClick={() => setActivePanelId(8)}
-                  className="text-white text-lg self-end bg-gray-500 p-1 rounded-lg hover:bg-gray-700"
-                >
-                  Edit Profile
-                </button>
-              </div>
-              <div className="w-full shadow-2xl rounded-lg p-3 break-all">
-                <p className="text-3xl font-semibold m-1">
-                  Hi {currentUser.username} !
-                </p>
-                <p className="text-lg font-semibold">
-                  Email:{currentUser.email}
-                </p>
-                <p className="text-lg font-semibold">
-                  Phone:{currentUser.phone}
-                </p>
-                <p className="text-lg font-semibold">
-                  Address:{currentUser.address}
-                </p>
-              </div>
-              <button
-                onClick={handleDeleteAccount}
-                className="text-red-600 hover:underline"
-              >
-                Delete account
-              </button>
-            </div>
-          </div>
-          {/* ---------------------------------------------------------------------------------------- */}
-          <div className="w-[65%] max-sm:w-full">
-            <div className="main-div">
-              <nav className="w-full border-blue-500 border-b-4 overflow-x-auto navbar">
-                <div className="w-full flex gap-2">
-                  <button
-                    className={
-                      activePanelId === 1
-                        ? "p-1 rounded-t transition-all duration-300 text-nowrap bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300 text-nowrap"
-                    }
-                    id="bookings"
-                    onClick={() => setActivePanelId(1)}
-                  >
-                    Bookings
-                  </button>
-                  <button
-                    className={
-                      activePanelId === 2
-                        ? "p-1 rounded-t transition-all duration-300 text-nowrap bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300 text-nowrap"
-                    }
-                    id="bookings"
-                    onClick={() => setActivePanelId(2)}
-                  >
-                    Add Packages
-                  </button>
-                  <button
-                    className={
-                      activePanelId === 3
-                        ? "p-1 rounded-t transition-all duration-300 text-nowrap bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300 text-nowrap"
-                    }
-                    id="bookings"
-                    onClick={() => setActivePanelId(3)}
-                  >
-                    All Packages
-                  </button>
-                  <button
-                    className={
-                      activePanelId === 4
-                        ? "p-1 rounded-t transition-all duration-300 text-nowrap bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300 text-nowrap"
-                    }
-                    id="bookings"
-                    onClick={() => setActivePanelId(4)}
-                  >
-                    Users
-                  </button>
-                  <button
-                    className={
-                      activePanelId === 5
-                        ? "p-1 rounded-t transition-all duration-300 text-nowrap bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300 text-nowrap"
-                    }
-                    id="bookings"
-                    onClick={() => setActivePanelId(5)}
-                  >
-                    Payments
-                  </button>
-                  <button
-                    className={
-                      activePanelId === 6
-                        ? "p-1 rounded-t transition-all duration-300 text-nowrap bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300 text-nowrap"
-                    }
-                    id="bookings"
-                    onClick={() => setActivePanelId(6)}
-                  >
-                    Ratings/Reviews
-                  </button>
-                  <button
-                    className={
-                      activePanelId === 7
-                        ? "p-1 rounded-t transition-all duration-300 text-nowrap bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300 text-nowrap"
-                    }
-                    id="bookings"
-                    onClick={() => setActivePanelId(7)}
-                  >
-                    History
-                  </button>
-                  {/* <button
-                    className={
-                      activePanelId === 7
-                        ? "p-1 rounded-t transition-all duration-300 text-nowrap bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300 text-nowrap"
-                    }
-                    id="updateProfile"
-                    onClick={() => setActivePanelId(7)}
-                  >
-                    Update Profile
-                  </button> */}
-                </div>
-              </nav>
-              <div className="content-div flex flex-wrap">
-                {activePanelId === 1 ? (
-                  <AllBookings />
-                ) : activePanelId === 2 ? (
-                  <AddPackages />
-                ) : activePanelId === 3 ? (
-                  <AllPackages />
-                ) : activePanelId === 4 ? (
-                  <AllUsers />
-                ) : activePanelId === 5 ? (
-                  <Payments />
-                ) : activePanelId === 6 ? (
-                  <RatingsReviews />
-                ) : activePanelId === 7 ? (
-                  <History />
-                ) : activePanelId === 8 ? (
-                  <AdminUpdateProfile />
-                ) : (
-                  <div>Page Not Found!</div>
-                )}
-              </div>
-            </div>
-          </div>
-        </>
-      ) : (
+  const activeLabel = NAV_ITEMS.find((n) => n.id === activePanelId)?.label || "";
+
+  const Sidebar = () => (
+    <aside className="flex flex-col h-full bg-slate-900 text-white">
+      {/* Logo */}
+      <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700/60">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+          style={{ background: "linear-gradient(135deg,#6366f1,#8b5cf6)" }}>
+          <FaPlane className="text-white -rotate-45" size={16} />
+        </div>
         <div>
-          <p className="text-red-700">Login First</p>
+          <p className="font-extrabold text-base text-white leading-none">Tripify</p>
+          <p className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Admin Panel</p>
+        </div>
+      </div>
+
+      {/* Avatar */}
+      <div className="flex flex-col items-center py-6 px-4 border-b border-slate-700/60">
+        <div className="relative group cursor-pointer" onClick={() => fileRef.current.click()}>
+          <img
+            src={(profilePhoto && URL.createObjectURL(profilePhoto)) || formData.avatar || defaultProfileImg}
+            alt="Admin"
+            className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-600 group-hover:border-indigo-400 transition-all"
+          />
+          <div className="absolute inset-0 rounded-2xl bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <FiCamera size={18} className="text-white" />
+          </div>
+        </div>
+        <input type="file" name="photo" id="photo" hidden ref={fileRef} accept="image/*"
+          onChange={(e) => setProfilePhoto(e.target.files[0])} />
+        {profilePhoto ? (
+          <button onClick={() => handleProfilePhoto(profilePhoto)}
+            className="mt-2 px-3 py-1 text-xs rounded-lg font-semibold text-white"
+            style={{ background: "linear-gradient(90deg,#6366f1,#8b5cf6)" }}>
+            {loading ? `Uploading ${photoPercentage}%` : "Upload Photo"}
+          </button>
+        ) : (
+          <>
+            <p className="mt-2 text-sm font-bold text-white truncate max-w-[140px]">{currentUser?.username}</p>
+            <span className="text-[10px] mt-0.5 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold uppercase tracking-wider">
+              Administrator
+            </span>
+          </>
+        )}
+      </div>
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto">
+        <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-widest px-3 mb-3">Navigation</p>
+        <ul className="space-y-1">
+          {NAV_ITEMS.map(({ id, label, icon }) => (
+            <li key={id}>
+              <button
+                onClick={() => { setActivePanelId(id); setSidebarOpen(false); }}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  activePanelId === id
+                    ? "text-white shadow-lg"
+                    : "text-slate-400 hover:text-white hover:bg-slate-800"
+                }`}
+                style={activePanelId === id
+                  ? { background: "linear-gradient(90deg,#6366f1,#8b5cf6)" }
+                  : {}}
+              >
+                <span className={activePanelId === id ? "text-white" : "text-slate-500"}>{icon}</span>
+                {label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </nav>
+
+      {/* Bottom actions */}
+      <div className="p-4 border-t border-slate-700/60 space-y-2">
+        <button onClick={handleLogout}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all">
+          <FiLogOut size={16} /> Sign Out
+        </button>
+        <button onClick={handleDeleteAccount}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-slate-500 hover:bg-slate-800 hover:text-red-400 transition-all">
+          <FiTrash2 size={16} /> Delete Account
+        </button>
+      </div>
+    </aside>
+  );
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <p className="text-red-500 font-semibold">Please log in first.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen bg-slate-50 font-sans overflow-hidden">
+
+      {/* Desktop sidebar */}
+      <div className="hidden lg:flex lg:w-64 flex-shrink-0 h-full">
+        <div className="w-full h-full overflow-y-auto">
+          <Sidebar />
+        </div>
+      </div>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <div className="absolute left-0 top-0 h-full w-64 z-10 overflow-y-auto">
+            <Sidebar />
+          </div>
         </div>
       )}
+
+      {/* Main content area */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+        {/* Top bar */}
+        <header className="flex-shrink-0 bg-white border-b border-slate-200 px-4 md:px-6 py-4 flex items-center justify-between shadow-sm">
+          <div className="flex items-center gap-4">
+            {/* Hamburger (mobile) */}
+            <button
+              className="lg:hidden p-2 rounded-xl hover:bg-slate-100 text-slate-600 transition-colors"
+              onClick={() => setSidebarOpen(true)}>
+              <FiMenu size={22} />
+            </button>
+            <div>
+              <h1 className="font-extrabold text-slate-800 text-xl leading-none">{activeLabel}</h1>
+              <p className="text-slate-400 text-xs mt-0.5">Tripify Admin Panel</p>
+            </div>
+          </div>
+
+          {/* Admin quick info */}
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:block text-right">
+              <p className="text-sm font-semibold text-slate-800">{currentUser.username}</p>
+              <p className="text-xs text-slate-400">{currentUser.email}</p>
+            </div>
+            <img
+              src={formData.avatar || defaultProfileImg}
+              alt="Admin"
+              className="w-9 h-9 rounded-xl object-cover border-2 border-indigo-200"
+            />
+          </div>
+        </header>
+
+        {/* Scrollable page content */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 bg-slate-50">
+          <div className="max-w-7xl mx-auto">
+            {activePanelId === 0 && <DashboardOverview />}
+            {activePanelId === 1 && <AllBookings />}
+            {activePanelId === 2 && <AddPackages />}
+            {activePanelId === 3 && <AllPackages />}
+            {activePanelId === 4 && <AllUsers />}
+            {activePanelId === 5 && <Payments />}
+            {activePanelId === 6 && <RatingsReviews />}
+            {activePanelId === 7 && <History />}
+            {activePanelId === 8 && <AdminUpdateProfile />}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

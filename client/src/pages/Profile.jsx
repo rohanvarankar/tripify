@@ -1,52 +1,35 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import {
-  updateUserStart,
-  updateUserSuccess,
-  updateUserFailure,
-  logOutStart,
-  logOutSuccess,
-  logOutFailure,
-  deleteUserAccountStart,
-  deleteUserAccountSuccess,
-  deleteUserAccountFailure,
+  updateUserStart, updateUserSuccess, updateUserFailure,
+  logOutStart, logOutSuccess, logOutFailure,
+  deleteUserAccountStart, deleteUserAccountSuccess, deleteUserAccountFailure,
 } from "../redux/user/userSlice";
-import {
-  getDownloadURL,
-  getStorage,
-  ref,
-  uploadBytesResumable,
-} from "firebase/storage";
+import { getDownloadURL, getStorage, ref, uploadBytesResumable } from "firebase/storage";
 import { app } from "../firebase";
 import MyBookings from "./user/MyBookings";
 import UpdateProfile from "./user/UpdateProfile";
 import MyHistory from "./user/MyHistory";
+import { FiArrowLeft, FiCamera, FiLogOut, FiSettings, FiTrash2, FiClock, FiHome } from "react-icons/fi";
 
 const Profile = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
   const fileRef = useRef(null);
-  const { currentUser, loading, error } = useSelector((state) => state.user);
-  const [profilePhoto, setProfilePhoto] = useState(undefined);
+  const { currentUser, loading } = useSelector((state) => state.user);
+
+  const [profilePhoto, setProfilePhoto] = useState(null);
   const [photoPercentage, setPhotoPercentage] = useState(0);
   const [activePanelId, setActivePanelId] = useState(1);
   const [formData, setFormData] = useState({
-    username: "",
-    email: "",
-    address: "",
-    phone: "",
-    avatar: "",
+    username: "", email: "", address: "", phone: "", avatar: "",
   });
 
   useEffect(() => {
-    if (currentUser !== null) {
+    if (currentUser) {
       setFormData({
-        username: currentUser.username,
-        email: currentUser.email,
-        address: currentUser.address,
-        phone: currentUser.phone,
-        avatar: currentUser.avatar,
+        username: currentUser.username, email: currentUser.email, address: currentUser.address, phone: currentUser.phone, avatar: currentUser.avatar,
       });
     }
   }, [currentUser]);
@@ -56,248 +39,122 @@ const Profile = () => {
       dispatch(updateUserStart());
       const storage = getStorage(app);
       const photoname = new Date().getTime() + photo.name.replace(/\s/g, "");
-      const storageRef = ref(storage, `profile-photos/${photoname}`); //profile-photos - folder name in firebase
+      const storageRef = ref(storage, `profile-photos/${photoname}`);
       const uploadTask = uploadBytesResumable(storageRef, photo);
 
       uploadTask.on(
         "state_changed",
-        (snapshot) => {
-          const progress = Math.floor(
-            (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-          );
-          //   console.log(progress);
-          setPhotoPercentage(progress);
-        },
-        (error) => {
-          console.log(error);
-        },
+        (snapshot) => setPhotoPercentage(Math.floor((snapshot.bytesTransferred / snapshot.totalBytes) * 100)),
+        (error) => console.log(error),
         () => {
           getDownloadURL(uploadTask.snapshot.ref).then(async (downloadUrl) => {
-            const res = await fetch(
-              `/api/user/update-profile-photo/${currentUser._id}`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": " application/json",
-                },
-                body: JSON.stringify({ avatar: downloadUrl }),
-              }
-            );
+            const res = await fetch(`/api/user/update-profile-photo/${currentUser._id}`, {
+              method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ avatar: downloadUrl }),
+            });
             const data = await res.json();
             if (data?.success) {
-              alert(data?.message);
-              setFormData({ ...formData, avatar: downloadUrl });
-              dispatch(updateUserSuccess(data?.user));
+              dispatch(updateUserSuccess(data.user));
               setProfilePhoto(null);
-              return;
-            } else {
-              dispatch(updateUserFailure(data?.message));
-            }
-            dispatch(updateUserFailure(data?.message));
-            alert(data?.message);
+            } else dispatch(updateUserFailure(data?.message));
           });
         }
       );
-    } catch (error) {
-      console.log(error);
-    }
+    } catch (error) { console.log(error); }
   };
 
   const handleLogout = async () => {
-    try {
-      dispatch(logOutStart());
-      const res = await fetch("/api/auth/logout");
-      const data = await res.json();
-      if (data?.success !== true) {
-        dispatch(logOutFailure(data?.message));
-        return;
-      }
-      dispatch(logOutSuccess());
-      navigate("/login");
-      alert(data?.message);
-    } catch (error) {
-      console.log(error);
-    }
+    dispatch(logOutStart());
+    const res = await fetch("/api/auth/logout");
+    const data = await res.json();
+    if (data?.success) { dispatch(logOutSuccess()); navigate("/login"); }
+    else dispatch(logOutFailure(data?.message));
   };
 
-  const handleDeleteAccount = async (e) => {
-    e.preventDefault();
-    const CONFIRM = confirm(
-      "Are you sure ? the account will be permenantly deleted!"
-    );
-    if (CONFIRM) {
-      try {
-        dispatch(deleteUserAccountStart());
-        const res = await fetch(`/api/user/delete/${currentUser._id}`, {
-          method: "DELETE",
-        });
-        const data = await res.json();
-        if (data?.success === false) {
-          dispatch(deleteUserAccountFailure(data?.message));
-          alert("Something went wrong!");
-          return;
-        }
-        dispatch(deleteUserAccountSuccess());
-        alert(data?.message);
-      } catch (error) {}
-    }
+  const handleDeleteAccount = async () => {
+    if (!confirm("Are you sure? The account will be permanently deleted!")) return;
+    dispatch(deleteUserAccountStart());
+    const res = await fetch(`/api/user/delete/${currentUser._id}`, { method: "DELETE" });
+    const data = await res.json();
+    if (data?.success) { dispatch(deleteUserAccountSuccess()); navigate("/"); }
+    else dispatch(deleteUserAccountFailure(data?.message));
   };
+
+  const navItems = [
+    { id: 1, label: "My Bookings", icon: <FiHome/> },
+    { id: 2, label: "History Logs", icon: <FiClock/> },
+    { id: 3, label: "Settings", icon: <FiSettings/> },
+  ];
 
   return (
-    <div className="flex w-full flex-wrap max-sm:flex-col p-2">
+    <div className="w-full min-h-screen bg-slate-50 relative pb-10">
+      
+      {/* Absolute top return bar */}
+      <div className="absolute top-0 left-0 w-full z-10 px-6 py-5 flex self-start pointer-events-none">
+        <button onClick={() => navigate('/')} className="flex items-center gap-2 px-5 py-2.5 bg-white/80 backdrop-blur-xl rounded-2xl shadow-sm border border-slate-200/50 text-slate-700 hover:text-indigo-600 font-bold transition-all hover:shadow-lg hover:-translate-y-1 pointer-events-auto">
+          <FiArrowLeft size={18} /> Return Home
+        </button>
+      </div>
+
       {currentUser ? (
-        <>
-          <div className="w-[40%] p-3 max-sm:w-full">
-            <div className="flex flex-col items-center gap-4 p-3">
-              <div className="w-full flex flex-col items-center relative">
-                <img
-                  src={
-                    (profilePhoto && URL.createObjectURL(profilePhoto)) ||
-                    formData.avatar
-                  }
-                  alt="Profile photo"
-                  className="w-64 min-h-52 max-h-64 rounded-lg"
-                  onClick={() => fileRef.current.click()}
-                  onMouseOver={() => {
-                    document
-                      .getElementById("photoLabel")
-                      .classList.add("block");
-                  }}
-                  onMouseOut={() => {
-                    document
-                      .getElementById("photoLabel")
-                      .classList.remove("block");
-                  }}
-                />
-                <input
-                  type="file"
-                  name="photo"
-                  id="photo"
-                  hidden
-                  ref={fileRef}
-                  accept="image/*"
-                  onChange={(e) => setProfilePhoto(e.target.files[0])}
-                />
-                <label
-                  htmlFor="photo"
-                  id="photoLabel"
-                  className="w-64 bg-slate-300 absolute bottom-0 p-2 text-center text-lg text-white font-semibold rounded-b-lg"
-                  hidden
-                >
-                  Choose Photo
-                </label>
+        <div className="max-w-6xl mx-auto pt-24 px-4 flex flex-col lg:flex-row gap-6">
+          
+          {/* LEFT USER PANEL */}
+          <div className="w-full lg:w-80 shrink-0">
+            <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 flex flex-col items-center">
+              <div className="relative group w-32 h-32 mb-5">
+                <img src={(profilePhoto && URL.createObjectURL(profilePhoto)) || formData.avatar} alt="Profile" className="w-full h-full object-cover rounded-full shadow-lg border-4 border-white z-10 relative" />
+                <div onClick={() => fileRef.current.click()} className="absolute inset-0 bg-slate-900/60 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-20">
+                  <FiCamera size={28} className="text-white" />
+                </div>
+                {/* Decorative pulse ring behind avatar */}
+                <div className="absolute inset-0 bg-indigo-500 rounded-full scale-110 opacity-10 animate-pulse z-0 hidden md:block" />
               </div>
+              <input type="file" hidden ref={fileRef} accept="image/*" onChange={(e) => setProfilePhoto(e.target.files[0])} />
+
               {profilePhoto && (
-                <div className="flex w-full justify-between gap-1">
-                  <button
-                    onClick={() => handleProfilePhoto(profilePhoto)}
-                    className="bg-green-700 p-2 text-white mt-3 flex-1 hover:opacity-90"
-                  >
-                    {loading ? `Uploading...(${photoPercentage}%)` : "Upload"}
-                  </button>
-                </div>
+                <button onClick={() => handleProfilePhoto(profilePhoto)} disabled={loading} className="mb-6 w-full bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl transition-all shadow-md active:scale-95">
+                  {loading ? `Uploading ${photoPercentage}%` : "Save Photo"}
+                </button>
               )}
-              <p
-                style={{
-                  width: "100%",
-                  borderBottom: "1px solid black",
-                  lineHeight: "0.1em",
-                  margin: "10px",
-                }}
-              >
-                <span className="font-semibold" style={{ background: "#fff" }}>
-                  Details
-                </span>
-              </p>
-              {/* <button
-                onClick={handleLogout}
-                className="text-red-600 text-lg font-semibold self-start border border-red-600 p-1 rounded-lg hover:bg-red-600 hover:text-white"
-              >
-                Log-out
-              </button> */}
-              <div className="w-full flex justify-between px-1">
-                <button
-                  onClick={handleLogout}
-                  className="text-red-600 text-lg font-semibold self-start border border-red-600 p-1 rounded-lg hover:bg-red-600 hover:text-white"
-                >
-                  Log-out
-                </button>
-                <button
-                  onClick={() => setActivePanelId(3)}
-                  className="text-white text-lg self-end bg-gray-500 p-1 rounded-lg hover:bg-gray-700"
-                >
-                  Edit Profile
-                </button>
-              </div>
-              <div className="w-full shadow-2xl rounded-lg p-3 break-all">
-                <p className="text-3xl font-semibold m-1">
-                  Hi {currentUser.username} !
-                </p>
-                <p className="text-lg font-semibold">
-                  Email:{currentUser.email}
-                </p>
-                <p className="text-lg font-semibold">
-                  Phone:{currentUser.phone}
-                </p>
-                <p className="text-lg font-semibold">
-                  Address:{currentUser.address}
-                </p>
-              </div>
-              <button
-                onClick={handleDeleteAccount}
-                className="text-red-600 hover:underline"
-              >
-                Delete account
-              </button>
-            </div>
-          </div>
-          {/* ---------------------------------------------------------------------------------------- */}
-          <div className="w-[60%] max-sm:w-full">
-            <div>
-              <nav className="w-full border-blue-500 border-b-4">
-                <div className="w-full flex gap-2">
-                  <button
-                    className={
-                      activePanelId === 1
-                        ? "p-1 rounded-t transition-all duration-300 bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300"
-                    }
-                    id="bookings"
-                    onClick={() => setActivePanelId(1)}
-                  >
-                    Bookings
+
+              <h2 className="text-xl font-extrabold text-slate-800 mb-1">{currentUser.username}</h2>
+              <p className="text-sm font-medium text-slate-500 mb-6 px-4 text-center truncate w-full">{currentUser.email}</p>
+
+              <div className="w-full space-y-2 border-t border-slate-100 pt-6 mb-6">
+                {navItems.map(item => (
+                  <button key={item.id} onClick={() => setActivePanelId(item.id)} className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-bold transition-all ${activePanelId === item.id ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20 translate-x-1' : 'text-slate-600 hover:bg-slate-50 border border-transparent blur-0'}`}>
+                    {item.icon} {item.label}
                   </button>
-                  <button
-                    className={
-                      activePanelId === 2
-                        ? "p-1 rounded-t transition-all duration-300 bg-blue-500 text-white"
-                        : "p-1 rounded-t transition-all duration-300"
-                    }
-                    id="updateProfile"
-                    onClick={() => setActivePanelId(2)}
-                  >
-                    History
-                  </button>
-                </div>
-              </nav>
-              {/* bookings */}
-              <div className="main flex flex-wrap">
-                {activePanelId === 1 && <MyBookings />}
-                {/* History */}
-                {activePanelId === 2 && <MyHistory />}
-                {/* Update profile */}
-                {activePanelId === 3 && <UpdateProfile />}
+                ))}
+              </div>
+
+              <div className="w-full flex justify-between pt-4 border-t border-slate-100">
+                <button onClick={handleLogout} className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-slate-500 hover:text-slate-800 transition-colors">
+                  <FiLogOut /> Logout
+                </button>
+                <button onClick={handleDeleteAccount} className="flex items-center gap-1.5 px-4 py-2 text-sm font-bold text-red-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                  <FiTrash2 /> Delete
+                </button>
               </div>
             </div>
           </div>
-        </>
+
+          {/* RIGHT CONTENT PANEL */}
+          <div className="flex-1 bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden min-h-[600px]">
+            <div className="p-6 md:p-8">
+              {activePanelId === 1 && <MyBookings />}
+              {activePanelId === 2 && <MyHistory />}
+              {activePanelId === 3 && <UpdateProfile />}
+            </div>
+          </div>
+        </div>
       ) : (
-        <div>
-          <p className="text-red-700">Login First</p>
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <h2 className="text-2xl font-bold text-slate-800 mb-4">Please login to view profile</h2>
+          <button onClick={() => navigate('/login')} className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors">Go to Login</button>
         </div>
       )}
     </div>
   );
 };
-
 export default Profile;

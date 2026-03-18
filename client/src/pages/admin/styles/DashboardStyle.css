@@ -1,15 +1,24 @@
-::-webkit-scrollbar{
-    width: 10px;
-    height: 10px !important;
+/* Scrollbar Width */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
 }
 
-::-webkit-scrollbar-track{
-    /* background: white !important; */
-    background: rgb(148, 165, 196) !important;
+/* Scrollbar Track */
+::-webkit-scrollbar-track {
+  background: #e6f4ea; /* very light green */
+  border-radius: 100vw;
 }
 
-::-webkit-scrollbar-thumb{
-    background: rgb(59, 130, 246) !important;
-    border-radius: 100vw;
-    border: white 0.5px solid;
+/* Scrollbar Thumb */
+::-webkit-scrollbar-thumb {
+  background: #15803d; /* green-700 */
+  border-radius: 100vw;
+  border: 2px solid #e6f4ea;
+  transition: background 0.3s ease;
+}
+
+/* Hover Effect */
+::-webkit-scrollbar-thumb:hover {
+  background: #166534; /* darker green */
 }

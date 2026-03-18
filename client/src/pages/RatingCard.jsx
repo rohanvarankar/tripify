@@ -1,117 +1,76 @@
 import { Rating } from "@mui/material";
-import React from "react";
+import React, { useState } from "react";
 import { FaArrowDown, FaArrowUp } from "react-icons/fa";
 
 const RatingCard = ({ packageRatings }) => {
+  const [expandedIndex, setExpandedIndex] = useState(null);
+
   return (
     <>
       {packageRatings &&
         packageRatings.map((rating, i) => {
+          const isExpanded = expandedIndex === i;
+
+          const reviewText =
+            rating.review && rating.review !== ""
+              ? rating.review
+              : rating.rating < 3
+              ? "Not Bad"
+              : "Good";
+
+          const isLong = reviewText.length > 90;
+
           return (
             <div
               key={i}
-              className="main relative w-full rounded-lg border p-3 gap-2 flex flex-col"
-              id="main"
+              className="w-full bg-white border border-gray-200 rounded-xl shadow-md p-4 flex flex-col gap-3"
             >
-              <div className="flex gap-2 items-center">
+              {/* User Info */}
+              <div className="flex items-center gap-3">
                 <img
-                  src={rating.userProfileImg || defaultProfileImg}
-                  alt={rating.username[0]}
-                  className="border w-6 h-6 border-black rounded-[50%]"
+                  src={rating.userProfileImg}
+                  alt={rating.username}
+                  className="w-8 h-8 rounded-full object-cover border border-gray-300"
                 />
-                <p className="font-semibold">{rating.username}</p>
+                <p className="font-semibold text-gray-800">
+                  {rating.username}
+                </p>
               </div>
+
+              {/* Rating */}
               <Rating
                 value={rating.rating || 0}
                 readOnly
                 size="small"
                 precision={0.1}
               />
-              {/* review */}
-              <p className="break-all">
-                <span
-                  className="break-all"
-                  id={rating.review.length > 90 ? "review-text" : "none"}
-                >
-                  {rating.review !== ""
-                    ? rating.review.length > 90
-                      ? rating.review.substring(0, 45)
-                      : rating.review
-                    : rating.rating < 3
-                    ? "Not Bad"
-                    : "Good"}
-                </span>
-                {rating.review.length > 90 && (
-                  <>
-                    <button
-                      id="more-btn"
-                      className={`m-1 font-semibold items-center gap-1 ${
-                        rating.review.length > 90 ? "flex" : "hidden"
-                      }`}
-                      onClick={() => {
-                        document.getElementById("popup").style.display =
-                          "block";
-                        document.getElementById("popup").style.zIndex = "99";
-                      }}
-                    >
-                      More
-                      <FaArrowDown />
-                    </button>
-                  </>
-                )}
+
+              {/* Review Text */}
+              <p className="text-gray-700 text-sm leading-relaxed">
+                {isLong && !isExpanded
+                  ? reviewText.substring(0, 90) + "..."
+                  : reviewText}
               </p>
-              {/* full review */}
-              {rating.review.length > 90 && (
-                <div
-                  className="hidden bg-white absolute left-0 top-0 popup"
-                  id="popup"
+
+              {/* Toggle Button */}
+              {isLong && (
+                <button
+                  onClick={() =>
+                    setExpandedIndex(isExpanded ? null : i)
+                  }
+                  className="flex items-center gap-2 text-green-700 font-medium text-sm hover:underline w-max"
                 >
-                  <div
-                    key={i}
-                    className="relative w-full rounded-lg border p-3 gap-2 flex flex-col"
-                  >
-                    <div className="flex gap-2 items-center">
-                      <img
-                        src={rating.userProfileImg || defaultProfileImg}
-                        alt={rating.username[0]}
-                        className="border w-6 h-6 border-black rounded-[50%]"
-                      />
-                      <p className="font-semibold">{rating.username}</p>
-                    </div>
-                    <Rating
-                      value={rating.rating || 0}
-                      readOnly
-                      size="small"
-                      precision={0.1}
-                    />
-                    {/* review */}
-                    <p className="break-words">
-                      <span
-                        className="break-words"
-                        id={rating.review.length > 90 ? "review-text" : "none"}
-                      >
-                        {rating.review}
-                      </span>
-                      {rating.review.length > 90 && (
-                        <>
-                          <button
-                            id="less-btn"
-                            className={`m-1 font-semibold flex items-center gap-1`}
-                            onClick={() => {
-                              document.getElementById("popup").style.display =
-                                "none";
-                            }}
-                          >
-                            Less
-                            <FaArrowUp />
-                          </button>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                </div>
+                  {isExpanded ? (
+                    <>
+                      Less <FaArrowUp />
+                    </>
+                  ) : (
+                    <>
+                      More <FaArrowDown />
+                    </>
+                  )}
+                </button>
               )}
-              {/* full review */}
             </div>
           );
         })}
